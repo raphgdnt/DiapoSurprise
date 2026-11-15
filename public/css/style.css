@@ -2065,3 +2065,44 @@ strong[style*="--pastille"] {
     filter: blur(6px);
   }
 }
+
+/* ---------- Récompenses de fin de partie ---------- */
+
+.recompenses {
+  display: grid;
+  gap: 0.55rem;
+  width: 100%;
+}
+.recompenses li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.6rem;
+  align-items: baseline;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.4rem 0.8rem 0.55rem;
+  background: var(--grain), var(--papier);
+  color: var(--feutre);
+  box-shadow: 0 12px 20px -12px #000;
+  animation: devoile 0.5s var(--attente, 0s) var(--sortie) backwards;
+}
+.recompenses li:nth-child(odd) {
+  rotate: -1deg;
+}
+.recompenses li:nth-child(even) {
+  rotate: 0.8deg;
+  margin-left: 0.8rem;
+}
+.recompense-titre {
+  font: 1.55rem/1 var(--main);
+}
+.recompenses strong {
+  color: var(--encre);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.recompense-detail {
+  grid-column: 1 / -1;
+  color: var(--encre-2);
+  font-size: 0.82rem;
+}

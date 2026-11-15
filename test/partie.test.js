@@ -161,7 +161,9 @@ try {
   for (let manche = 1; manche <= 3; manche++) {
     await attendre(() => tous.every((x) => x.etat.phase === "ecriture" && x.etat.manche === manche), `écriture de la manche ${manche}`);
     assert.equal(new Set(tous.map((x) => x.etat.ecriture.titre)).size, 1, "un seul sujet pour toute la salle");
-    assert.equal(a.etat.imprevu?.type ?? null, [null, "consigne", "finale"][manche - 1], "un imprévu en manche 2, la finale en manche 3");
+    // En manche 2, l'imprévu est une consigne affichée, ou un échange de diapos tenu secret pendant l'écriture.
+    const imprevuVu = a.etat.imprevu?.type ?? null;
+    assert.ok(manche === 1 ? imprevuVu === null : manche === 3 ? imprevuVu === "finale" : imprevuVu === null || imprevuVu === "consigne", "un imprévu en manche 2, la finale en manche 3");
     sujets.add(a.etat.ecriture.titre);
     assert.deepEqual(tous.map((x) => x.etat.ecriture.role).sort(), ["conclusion", "ouverture", "suite"]);
     for (const x of tous) {
@@ -199,6 +201,10 @@ try {
   assert.equal(sujets.size, 3, "un sujet différent à chaque manche");
   assert.ok(!sujets.has("sujet ignoré en relais"));
   const manches = a.etat.resultats.manches;
+  for (const m of manches) for (const e of m.exposes) assert.notEqual(e.presentateurId, e.auteurId, "personne ne présente sa propre diapo, même après un échange");
+  const titres = a.etat.resultats.recompenses.map((x) => x.titre);
+  assert.ok(titres.includes("Plume d'or"), "des récompenses sont décernées");
+  assert.ok(a.etat.resultats.recompenses.every((x) => a.etat.joueurs.some((j) => j.id === x.joueurId) && x.detail));
   assert.equal(manches.length, 3);
   assert.equal(somme(manches, (m) => somme(m.exposes, (e) => e.voix)), 9, "trois votes par manche");
   assert.equal(somme(a.etat.joueurs, (j) => j.score), 2400, "100 à l'orateur et 100 à l'auteur par vote, doublés en finale");

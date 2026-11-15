@@ -129,7 +129,13 @@ function applaudimetre() {
 }
 
 const texteImprevu = (imprevu) =>
-  !imprevu ? "" : imprevu.type === "finale" ? "Manche finale : tout compte double, et chaque diapo ne dure que 12 secondes." : `Imprévu de la manche : ${imprevu.texte.charAt(0).toLowerCase()}${imprevu.texte.slice(1)}.`;
+  !imprevu
+    ? ""
+    : imprevu.type === "finale"
+      ? "Manche finale : tout compte double, et chaque diapo ne dure que 12 secondes."
+      : imprevu.type === "echange"
+        ? "Imprévu : les diapos ont été échangées. Personne ne présente celle qu'on lui destinait."
+        : `Imprévu de la manche : ${imprevu.texte.charAt(0).toLowerCase()}${imprevu.texte.slice(1)}.`;
 
 /* ---------- Accueil ---------- */
 
@@ -818,6 +824,7 @@ function ecranResultats(etat) {
     }, 2500);
   });
   const hote = etat.hoteId === etat.moi.id;
+  const suspense = (classement.length - 1) * 0.5 + 1.2;
   let rang = 0;
   scene.append(
     h(
@@ -835,6 +842,15 @@ function ecranResultats(etat) {
             return h("li", { style: `--pastille:${couleur(j)}; --attente:${(classement.length - 1 - i) * 0.5 + 1.2}s` }, h("span", { class: "classement-rang" }, rang), h("span", { class: "classement-nom" }, j.nom), h("span", { class: "classement-score" }, `${j.score} pts`));
           })
         ),
+        etat.resultats.recompenses.length
+          ? h(
+              "ul",
+              { class: "recompenses" },
+              etat.resultats.recompenses.map((r, i) =>
+                h("li", { style: `--attente:${suspense + 0.5 + i * 0.25}s` }, h("span", { class: "recompense-titre" }, r.titre), h("strong", { style: `--pastille:${couleur(joueur(etat, r.joueurId))}` }, joueur(etat, r.joueurId).nom), h("span", { class: "recompense-detail" }, r.detail))
+              )
+            )
+          : null,
         vedette && poids(vedette) > 0 ? souvenir : null,
         hote ? h("button", { class: "bouton bouton--principal", type: "button", onclick: () => dire({ t: "rejouer" }) }, "Rejouer avec les mêmes") : h("p", { class: "salon-attente" }, `${joueur(etat, etat.hoteId).nom} peut relancer une partie.`)
       ),
@@ -895,7 +911,6 @@ function ecranResultats(etat) {
       )
     )
   );
-  const suspense = (classement.length - 1) * 0.5 + 1.2;
   scene.querySelector(".resultats").style.setProperty("--suspense", `${suspense}s`);
   sons.roulement(suspense);
   sons.fanfare(suspense);
@@ -918,6 +933,7 @@ function afficher(etat) {
     scrollTo(0, 0);
     if (phase === "ecriture") annonce(etat.mode === "relais" ? `Manche ${etat.manche}` : "À vos diapos", etat.imprevu ? texteImprevu(etat.imprevu) : etat.mode === "relais" && etat.manche === 1 ? "Une diapo chacun, pour quelqu'un d'autre." : "");
     else if (phase === "vote") annonce("Au vote");
+    else if (phase === "presentation" && etat.imprevu?.type === "echange") annonce("Imprévu", "Les diapos ont été échangées. Personne ne présente celle qu'on lui destinait.");
     else if (phase === "presentation") clicClac();
   }
   if (etat) courant.maj(etat);

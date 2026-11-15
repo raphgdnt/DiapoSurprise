@@ -200,7 +200,13 @@ function lancerManche(salon, diffuser) {
   const n = ordre.length;
   // Imprévus du relais : une consigne commune en manche 2, puis une finale plus rapide où tout compte double.
   salon.imprevu =
-    !relais(salon) || salon.manche === 1 ? null : salon.manche === MANCHES_RELAIS ? { type: "finale" } : { type: "consigne", texte: melange(CONSIGNES)[0] };
+    !relais(salon) || salon.manche === 1
+      ? null
+      : salon.manche === MANCHES_RELAIS
+        ? { type: "finale" }
+        : n >= 3 && Math.random() < 0.3
+          ? { type: "echange" } // tenu secret pendant l'écriture : chacun présentera la diapo écrite pour un autre
+          : { type: "consigne", texte: melange(CONSIGNES)[0] };
   const auteur = (i) => ordre[(i - 1 + n) % n].id;
   if (relais(salon)) {
     const [titre] = tirerTitres(salon, 1);
@@ -265,6 +271,13 @@ function lancerPresentations(salon, diffuser) {
     e.slides = e.slides.map((sl) =>
       slideVide(sl) ? nettoyerSlide({ gabarit: "titre", champs: { titre: "Diapo laissée vide", sousTitre: `${auteur} n'a rien écrit. Improvise.` } }) : sl
     );
+  }
+  if (salon.imprevu?.type === "echange") {
+    // Chacun présente la diapo écrite pour un autre. Un décalage de deux évite de retomber sur la sienne
+    // (celui qui écrit pour le passage i+1 est le présentateur du passage i).
+    const n = salon.exposes.length;
+    const origine = salon.exposes.map((e) => ({ auteurId: e.auteurId, slides: e.slides }));
+    salon.exposes.forEach((e, i) => Object.assign(e, origine[(i + 2) % n]));
   }
   salon.phase = "presentation";
   ouvrirExpose(salon, 0, diffuser);
@@ -426,6 +439,29 @@ export function retourSalon(salon) {
   if (!salon.joueurs.some((j) => j.id === salon.hoteId)) salon.hoteId = salon.joueurs[0]?.id ?? null;
 }
 
+/* ---------- Récompenses de fin de partie ---------- */
+
+// Des titres honorifiques tirés de ce qui s'est passé pendant la partie. Ils ne rapportent aucun point.
+function recompenses(salon) {
+  const passages = salon.historique.flatMap((m) => m.exposes);
+  const compte = (ajouter) => {
+    const totaux = {};
+    const plus = (joueurId, n = 1) => n && (totaux[joueurId] = (totaux[joueurId] ?? 0) + n);
+    passages.forEach((e) => ajouter(e, plus));
+    const [joueurId, valeur] = Object.entries(totaux).sort((a, b) => b[1] - a[1])[0] ?? [];
+    return joueurId && trouver(salon, joueurId) ? { joueurId, valeur } : null;
+  };
+  const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+  const titres = [
+    ["Chouchou du public", compte((e, plus) => plus(e.presentateurId, e.applaudi ?? 0)), (n) => `${pluriel(n, "réaction")} en parlant`],
+    ["Plume d'or", compte((e, plus) => plus(e.auteurId, (e.voix ?? 0) + (e.voixSlides ?? 0))), (n) => `${pluriel(n, "gommette")} pour ses diapos`],
+    ["Cible préférée", compte((e, plus) => plus(e.presentateurId, e.pieges.length)), (n) => `${(n > 1 ? n + " petits mots" : "1 petit mot")} reçu${n > 1 ? "s" : ""} en pleine conférence`],
+    ["Saboteur en chef", compte((e, plus) => e.pieges.forEach((p) => plus(p.deId))), (n) => `${(n > 1 ? n + " petits mots" : "1 petit mot")} glissé${n > 1 ? "s" : ""} aux autres`],
+    ["Meilleur public", compte((e, plus) => Object.entries(e.reactions).forEach(([jid, k]) => plus(jid, k))), (n) => `${pluriel(n, "réaction")} envoyée${n > 1 ? "s" : ""}`],
+  ];
+  return titres.filter(([, gagnant]) => gagnant).map(([titre, gagnant, detail]) => ({ titre, joueurId: gagnant.joueurId, detail: detail(gagnant.valeur) }));
+}
+
 /* ---------- Ce qu'un joueur donné a le droit de voir à cet instant ---------- */
 
 export function vue(salon, moi) {
@@ -442,7 +478,7 @@ export function vue(salon, moi) {
     ecritureRelaisSecondes: salon.ecritureRelaisSecondes,
     manche: salon.manche,
     manches: relais(salon) ? MANCHES_RELAIS : 1,
-    imprevu: salon.imprevu,
+    imprevu: salon.imprevu?.type === "echange" && salon.phase === "ecriture" ? null : salon.imprevu,
     moi: { id: moi.id, nom: moi.nom, enJeu: moi.enJeu, spectateur: moi.spectateur, piegeChoix: moi.piegeUtilise ? [] : moi.piegeChoix },
     joueurs: salon.joueurs.map((j) => ({
       id: j.id,
@@ -523,7 +559,7 @@ export function vue(salon, moi) {
       voix: e.voix ?? 0,
       applaudi: e.applaudi ?? 0,
     });
-    v.resultats = { manches: salon.historique.map((m) => ({ titre: m.titre, exposes: m.exposes.map(detail) })) };
+    v.resultats = { manches: salon.historique.map((m) => ({ titre: m.titre, exposes: m.exposes.map(detail) })), recompenses: recompenses(salon) };
   }
   return v;
 }
