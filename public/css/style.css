@@ -1941,3 +1941,127 @@ strong[style*="--pastille"] {
     width: 104px;
   }
 }
+
+/* ---------- Du son, du mouvement : annonces, révélation de l'auteur, podium ---------- */
+
+.annonce {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: rgb(18 16 14 / 0.86);
+  text-align: center;
+  pointer-events: none;
+  animation: annonce 2.2s linear forwards;
+}
+.annonce-titre {
+  color: var(--jaune);
+  font: clamp(3.2rem, 10vw, 7.5rem) / 1 var(--titre);
+  animation: annonce-titre 0.7s var(--sortie) backwards;
+}
+.annonce-sous {
+  max-width: 34ch;
+  color: var(--texte);
+  font: clamp(1.6rem, 3vw, 2.3rem) / 1 var(--main);
+  animation: annonce-titre 0.7s 0.15s var(--sortie) backwards;
+}
+@keyframes annonce {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes annonce-titre {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    scale: 1.5;
+  }
+}
+
+.signature {
+  position: absolute;
+  right: -2%;
+  bottom: 7%;
+  z-index: 4;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem 1.1rem 0.7rem;
+  background: var(--grain), var(--carton);
+  color: var(--feutre);
+  font: clamp(1.3rem, 2.2vw, 1.8rem) / 1 var(--main);
+  box-shadow: 0 18px 30px -14px rgb(0 0 0 / 0.85);
+  rotate: -4deg;
+  animation: signature 0.6s var(--sortie);
+}
+.signature strong {
+  font-size: 2.1em;
+  font-weight: 400;
+  text-decoration-thickness: 0.09em;
+}
+@keyframes signature {
+  from {
+    opacity: 0;
+    translate: 60px 30px;
+    rotate: 14deg;
+    scale: 1.3;
+  }
+}
+.siege--auteur {
+  box-shadow: inset 0 0 0 2px var(--jaune);
+  color: var(--texte);
+}
+.siege--reagit {
+  animation: sursaut 0.35s var(--sortie);
+}
+@keyframes sursaut {
+  30% {
+    translate: 0 -7px;
+  }
+}
+.eclat {
+  font-size: 3rem;
+}
+@keyframes pouls {
+  from {
+    scale: 1.35;
+  }
+}
+
+/* Le carrousel tourne lentement en attendant les joueurs. */
+.plateau {
+  animation: tourne 80s linear infinite;
+}
+@keyframes tourne {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Classement dévoilé du dernier au premier, après un roulement de tambour. */
+.classement li {
+  animation: devoile 0.55s var(--attente, 0s) var(--sortie) backwards;
+}
+.palmares h1,
+.palmares > .bouton,
+.palmares > .salon-attente,
+.resultats .planche {
+  animation: devoile 0.7s calc(var(--suspense, 0s) + 0.25s) var(--sortie) backwards;
+}
+@keyframes devoile {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+    filter: blur(6px);
+  }
+}

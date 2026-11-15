@@ -101,7 +101,11 @@ try {
           spectateur.dire({ t: "piege", choix: 0 });
           piegeTendu = true;
         }
+      } else if (p.etape === "auteur") {
+        assert.ok(p.auteurId && p.auteurId !== p.presentateurId, "l'auteur est révélé après le passage");
+        assert.ok(p.slide, "la diapo reste à l'écran pendant la révélation");
       } else {
+        assert.equal(p.auteurId, null, "l'auteur reste secret tant que le passage n'est pas fini");
         assert.equal(p.slide, null, "pas de slide pendant l'intro ou la sortie");
       }
     }

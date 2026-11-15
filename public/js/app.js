@@ -2,6 +2,7 @@ import { session, sur, dire, maintenant, creerSalon, rejoindreSalon, nomMemorise
 import { h, GABARITS, champsVides, rendreDiapo, rendreEditeur, diapoVide } from "./diapo.js";
 import { inspirer } from "./inspiration.js";
 import { enregistrerSouvenir } from "./souvenir.js";
+import { sons, sonActif, basculerSon } from "./son.js";
 
 const scene = document.getElementById("scene");
 const COULEURS = ["#e2412b", "#f08a1c", "#f5c518", "#3aa655", "#1fa3a3", "#3b6fe0", "#8a55d6", "#e85c9c"];
@@ -12,40 +13,15 @@ const joueur = (etat, id) => etat.joueurs.find((j) => j.id === id) ?? { nom: "Qu
 const couleur = (j) => COULEURS[j.place % COULEURS.length];
 const copie = (x) => JSON.parse(JSON.stringify(x));
 
-/* ---------- Son : le clic-clac du projecteur, synthétisé ---------- */
+/* ---------- Son ---------- */
 
-let audio = null;
-let sonActif = localStorage.getItem("diapo-surprise:son") !== "non";
+const clicClac = () => sons.clicClac();
 const boutonSon = document.querySelector(".son");
-boutonSon.setAttribute("aria-pressed", sonActif);
+boutonSon.setAttribute("aria-pressed", sonActif());
 boutonSon.addEventListener("click", () => {
-  sonActif = !sonActif;
-  localStorage.setItem("diapo-surprise:son", sonActif ? "oui" : "non");
-  boutonSon.setAttribute("aria-pressed", sonActif);
-  if (sonActif) clicClac();
+  boutonSon.setAttribute("aria-pressed", basculerSon());
+  clicClac();
 });
-addEventListener("pointerdown", () => (audio ??= new AudioContext()), { once: true });
-
-function clicClac() {
-  if (!sonActif || !audio) return;
-  const coup = (quand, frequence, volume) => {
-    const duree = 0.05;
-    const tampon = audio.createBuffer(1, audio.sampleRate * duree, audio.sampleRate);
-    const donnees = tampon.getChannelData(0);
-    for (let i = 0; i < donnees.length; i++) donnees[i] = (Math.random() * 2 - 1) * (1 - i / donnees.length) ** 3;
-    const source = audio.createBufferSource();
-    source.buffer = tampon;
-    const filtre = audio.createBiquadFilter();
-    filtre.type = "bandpass";
-    filtre.frequency.value = frequence;
-    const gain = audio.createGain();
-    gain.gain.value = volume;
-    source.connect(filtre).connect(gain).connect(audio.destination);
-    source.start(audio.currentTime + quand);
-  };
-  coup(0, 900, 0.5);
-  coup(0.11, 1700, 0.35);
-}
 
 /* ---------- Petits mots : erreurs et informations ---------- */
 
@@ -56,6 +32,15 @@ function petitMot(texte, duree = 4500) {
   setTimeout(() => el.remove(), duree);
 }
 sur("erreur", (texte) => petitMot(texte));
+
+// Une annonce qui traverse l'écran : nouvelle manche, ouverture du vote.
+function annonce(titre, sous) {
+  document.querySelector(".annonce")?.remove();
+  const el = h("div", { class: "annonce", role: "status" }, h("p", { class: "annonce-titre" }, titre), sous && h("p", { class: "annonce-sous" }, sous));
+  document.body.append(el);
+  sons.annonce();
+  setTimeout(() => el.remove(), 2300);
+}
 sur("lien", (ok) => (document.body.dataset.lien = ok ? "ok" : "perdu"));
 
 /* ---------- Composants ---------- */
@@ -105,6 +90,12 @@ function minuterie() {
       chiffres.textContent = reste >= 60 ? `${Math.floor(reste / 60)}:${String(reste % 60).padStart(2, "0")}` : reste;
       aiguille.style.transform = `rotate(${(1 - (reste * 1000) / total) * 360}deg)`;
       el.classList.toggle("minuterie--urgence", reste <= 5 && fin > 0);
+      if (reste <= 5 && reste > 0 && fin > 0) {
+        sons.tic(reste);
+        chiffres.style.animation = "none";
+        void chiffres.offsetWidth;
+        chiffres.style.animation = "pouls 0.45s var(--sortie)";
+      }
       el.setAttribute("aria-label", `${reste} secondes restantes`);
     },
   };
@@ -591,7 +582,8 @@ const REACTIONS = [
 function ecranPresentation() {
   const chrono = minuterie();
   const petitsMots = h("div", { class: "billets" });
-  const ecran = ecranProjection(petitsMots);
+  const signature = h("p", { class: "signature", hidden: true });
+  const ecran = ecranProjection(petitsMots, signature);
   const titre = h("h1", {});
   const sujet = h("p", { class: "legende-feutre" });
   const pions = h("ol", { class: "pions", "aria-label": "Avancement" });
@@ -624,6 +616,10 @@ function ecranPresentation() {
     const siege = publicEl.querySelector(`[data-id="${m.deId}"]`);
     const r = REACTIONS.find((x) => x.genre === m.genre);
     if (!siege || !r) return;
+    sons.reaction(m.genre);
+    siege.classList.remove("siege--reagit");
+    void siege.offsetWidth;
+    siege.classList.add("siege--reagit");
     const mot = h("span", { class: "eclat", style: `--penche:${Math.round(Math.random() * 16 - 8)}deg; --decale:${Math.round(Math.random() * 30 - 15)}px` }, r.mot);
     siege.append(mot);
     mot.addEventListener("animationend", () => mot.remove());
@@ -638,13 +634,25 @@ function ecranPresentation() {
       const orateur = joueur(etat, p.presentateurId);
       const moiOrateur = p.presentateurId === etat.moi.id;
       chrono.regler(etat.finA);
-      jauge.regler(p.etape === "slide" ? p.applaudi : 0, p.applaudiMax);
+      jauge.regler(p.etape === "slide" || p.etape === "auteur" ? p.applaudi : 0, p.applaudiMax);
       imprevu.textContent = texteImprevu(etat.imprevu);
       imprevu.hidden = !etat.imprevu;
 
       const enRelais = etat.mode === "relais";
       const nouvelleCle = `${p.index}-${p.etape}-${p.numeroSlide}`;
-      if (nouvelleCle !== cle) {
+      if (nouvelleCle !== cle && p.etape === "auteur") {
+        // La diapo reste à l'écran et la signature de l'auteur vient s'y coller.
+        const auteur = joueur(etat, p.auteurId);
+        const deMoi = p.auteurId === etat.moi.id;
+        signature.replaceChildren(h("span", {}, "écrit par"), h("strong", { style: `--pastille:${couleur(auteur)}` }, deMoi ? "toi" : auteur.nom));
+        signature.hidden = false;
+        const image = ecran.querySelector(".ecran-image");
+        if (!image.firstChild) image.replaceChildren(rendreDiapo(p.slide)); // arrivée en pleine révélation
+        sons.pop();
+        cle = nouvelleCle;
+      } else if (nouvelleCle !== cle) {
+        signature.hidden = true;
+        if (p.etape === "sortie") sons.applaudissements();
         const contenu =
           p.etape === "intro"
             ? carton([enRelais ? (moiOrateur ? "Conférence collective. Tu ouvres." : `Conférence collective. ${orateur.nom} ouvre.`) : moiOrateur ? "C'est à toi. Ta conférence :" : `${orateur.nom} présente`, p.titre])
@@ -668,7 +676,8 @@ function ecranPresentation() {
       const nbPions = enRelais ? p.total : p.nbSlides;
       const pionCourant = enRelais ? p.index : p.numeroSlide;
       if (pions.children.length !== nbPions) pions.replaceChildren(...Array.from({ length: nbPions }, () => h("li")));
-      [...pions.children].forEach((li, i) => (li.className = p.etape === "slide" && i === pionCourant ? "pion--allume" : p.etape === "sortie" || (p.etape === "slide" && i < pionCourant) ? "pion--passe" : ""));
+      const surDiapo = p.etape === "slide" || p.etape === "auteur";
+      [...pions.children].forEach((li, i) => (li.className = surDiapo && i === pionCourant ? "pion--allume" : p.etape === "sortie" || (surDiapo && i < pionCourant) ? "pion--passe" : ""));
       rang.textContent = enRelais ? `Manche ${etat.manche} sur ${etat.manches}` : `Exposé ${p.index + 1} sur ${p.total}`;
       ensuite.textContent = p.etape === "sortie" || !p.suivantId ? "" : p.suivantId === etat.moi.id ? "Tu es le prochain." : `Ensuite : ${joueur(etat, p.suivantId).nom}`;
       ensuite.classList.toggle("ensuite--moi", p.suivantId === etat.moi.id && p.etape !== "sortie");
@@ -677,7 +686,7 @@ function ecranPresentation() {
 
       publicEl.replaceChildren(
         ...etat.joueurs.map((j) =>
-          h("li", { class: `siege ${j.id === p.presentateurId ? "siege--scene" : ""} ${j.connecte ? "" : "siege--absent"} ${j.spectateur ? "siege--regarde" : ""}`, "data-id": j.id, style: `--pastille:${couleur(j)}` }, h("span", { class: "siege-nom" }, j.nom))
+          h("li", { class: `siege ${j.id === p.presentateurId ? "siege--scene" : ""} ${j.id === p.auteurId ? "siege--auteur" : ""} ${j.connecte ? "" : "siege--absent"} ${j.spectateur ? "siege--regarde" : ""}`, "data-id": j.id, style: `--pastille:${couleur(j)}` }, h("span", { class: "siege-nom" }, j.nom))
         )
       );
       reactions.hidden = moiOrateur;
@@ -823,7 +832,7 @@ function ecranResultats(etat) {
           { class: "classement" },
           classement.map((j, i) => {
             if (i === 0 || j.score < classement[i - 1].score) rang = i + 1;
-            return h("li", { style: `--pastille:${couleur(j)}` }, h("span", { class: "classement-rang" }, rang), h("span", { class: "classement-nom" }, j.nom), h("span", { class: "classement-score" }, `${j.score} pts`));
+            return h("li", { style: `--pastille:${couleur(j)}; --attente:${(classement.length - 1 - i) * 0.5 + 1.2}s` }, h("span", { class: "classement-rang" }, rang), h("span", { class: "classement-nom" }, j.nom), h("span", { class: "classement-score" }, `${j.score} pts`));
           })
         ),
         vedette && poids(vedette) > 0 ? souvenir : null,
@@ -886,6 +895,10 @@ function ecranResultats(etat) {
       )
     )
   );
+  const suspense = (classement.length - 1) * 0.5 + 1.2;
+  scene.querySelector(".resultats").style.setProperty("--suspense", `${suspense}s`);
+  sons.roulement(suspense);
+  sons.fanfare(suspense);
   return { maj() {} };
 }
 
@@ -903,7 +916,9 @@ function afficher(etat) {
     courant = ECRANS[phase](etat);
     courant.phase = phase;
     scrollTo(0, 0);
-    if (phase !== "accueil" && phase !== "salon") clicClac();
+    if (phase === "ecriture") annonce(etat.mode === "relais" ? `Manche ${etat.manche}` : "À vos diapos", etat.imprevu ? texteImprevu(etat.imprevu) : etat.mode === "relais" && etat.manche === 1 ? "Une diapo chacun, pour quelqu'un d'autre." : "");
+    else if (phase === "vote") annonce("Au vote");
+    else if (phase === "presentation") clicClac();
   }
   if (etat) courant.maj(etat);
   courant.tic?.();

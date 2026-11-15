@@ -18,6 +18,7 @@ export const DUREES = {
   slide: s(15, 0.15),
   slideRelais: s(18, 0.15),
   slideFinale: s(12, 0.15),
+  auteur: s(3, 0.1), // révélation de qui a écrit, après chaque passage
   sortie: s(4, 0.15),
   vote: s(60, 2),
   voteRelais: s(30, 2),
@@ -294,11 +295,15 @@ export function avancer(salon, diffuser) {
   } else if (c.etape === "slide" && c.slide < salon.exposes[c.index].slides.length - 1) {
     c.slide++;
     programmer(salon, dureeSlide, suite, diffuser);
-  } else if (c.etape === "slide" && relais(salon) && prochain(salon, c.index + 1) < salon.exposes.length) {
+  } else if (c.etape === "slide") {
+    // Le passage est fini : on révèle qui avait écrit, la diapo reste à l'écran.
+    c.etape = "auteur";
+    programmer(salon, DUREES.auteur, suite, diffuser);
+  } else if (c.etape === "auteur" && relais(salon) && prochain(salon, c.index + 1) < salon.exposes.length) {
     // En relais on passe directement la parole au suivant, sans carton intermédiaire.
     salon.courant = { index: prochain(salon, c.index + 1), etape: "slide", slide: 0 };
     programmer(salon, dureeSlide, suite, diffuser);
-  } else if (c.etape === "slide") {
+  } else if (c.etape === "auteur") {
     c.etape = "sortie";
     programmer(salon, DUREES.sortie, suite, diffuser);
   } else if (relais(salon)) {
@@ -480,7 +485,8 @@ export function vue(salon, moi) {
       presentateurId: e.presentateurId,
       suivantId: salon.exposes[prochain(salon, c.index + 1)]?.presentateurId ?? null,
       titre: e.titre,
-      slide: c.etape === "slide" ? e.slides[c.slide] : null,
+      slide: c.etape === "slide" || c.etape === "auteur" ? e.slides[c.slide] : null,
+      auteurId: c.etape === "auteur" ? e.auteurId : null,
       pieges: e.pieges.filter((p) => c.etape === "slide" && p.slide === c.slide).map((p) => ({ texte: p.texte, deId: p.deId })),
       peutPieger: c.etape === "slide" && moi.enJeu && !moi.piegeUtilise && e.presentateurId !== moi.id,
       peutPasser: peutPasser(salon, moi),
