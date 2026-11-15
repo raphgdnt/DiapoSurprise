@@ -1,0 +1,10 @@
+# Déploiement sur Render : un seul service web Node, qui sert les fichiers et les salons en WebSocket.
+services:
+  - type: web
+    name: diapo-surprise
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /

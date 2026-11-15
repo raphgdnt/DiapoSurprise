@@ -1,0 +1,17 @@
+{
+  "name": "diapo-surprise",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Jeu de présentation improvisée : tes potes écrivent tes slides.",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node test/partie.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

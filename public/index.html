@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diapo Surprise</title>
+  <meta name="description" content="Le jeu où tes potes écrivent tes diapos. Tu les découvres en les présentant.">
+  <meta name="theme-color" content="#12100e">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/caprasimo.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body data-phase="accueil">
+  <header class="bandeau">
+    <a class="marque" href="/">Diapo Surprise</a>
+    <button class="son" type="button" aria-pressed="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="son-ondes" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="son-barre" d="M15.5 9.5l5 5m0-5l-5 5"/></svg>
+      <span>Son du projecteur</span>
+    </button>
+  </header>
+
+  <main id="scene"></main>
+
+  <div class="mots" role="status" aria-live="polite"></div>
+  <noscript><p class="sans-js">Diapo Surprise a besoin de JavaScript pour fonctionner.</p></noscript>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
